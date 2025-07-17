@@ -4,13 +4,18 @@
  */
 package autoprintr;
 
+import java.awt.BorderLayout;
 import java.awt.Desktop;
+import java.awt.Font;
+import java.awt.Image;
+import java.awt.Toolkit;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -22,43 +27,84 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.text.DefaultCaret;
 
 public class AutoPrintR {
-    //GUI Components
+    // GUI Components
     private JFrame gui;
     private JPanel mainPnl;
-    
+
     private static JTextArea msgTxt;
-    
     private JButton chooseFolderBtn;
-    
-    public AutoPrintR(){
+
+    public AutoPrintR() {
         gui = new JFrame("AutoPrintR");
-        gui.setSize(450,480);
+        gui.setSize(450, 480);
         gui.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-	gui.setLocationRelativeTo(null);
+        gui.setLocationRelativeTo(null);
         
+            URL iconURL = getClass().getResource("/resources/a.png");
+        if (iconURL != null) {
+            Image icon = Toolkit.getDefaultToolkit().getImage(iconURL);
+            gui.setIconImage(icon); // setIconImage replaces default icon :contentReference[oaicite:1]{index=1}
+        } else {
+            System.err.println("Icon not found at /resources/myIcon.png");
+        }
+
+        // Create heading label
+        JLabel heading = new JLabel("Automate Your Prints", JLabel.CENTER);
+        heading.setFont(new Font("SansSerif", Font.BOLD, 18));
+        heading.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        // Optionally: heading.setOpaque(true); heading.setBackground(Color.LIGHT_GRAY);
+
         mainPnl = new JPanel();
-        
+        mainPnl.setLayout(new BorderLayout());
+
+ 
+        // Text area with scroll pane
         msgTxt = new JTextArea(15, 30);
         msgTxt.setEditable(false);
         msgTxt.setLineWrap(true);
         msgTxt.setWrapStyleWord(true);
-        
+        JScrollPane scrollPane = new JScrollPane(msgTxt);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
+        // Force auto-scroll when appending
+        DefaultCaret caret = (DefaultCaret) msgTxt.getCaret();
+        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+
+        // Button
         chooseFolderBtn = new JButton("Choose/Change Folder");
-        
-        mainPnl.add(msgTxt);
-        mainPnl.add(chooseFolderBtn);
-        
+        chooseFolderBtn.addActionListener(e -> {
+         chooseFolderToWatch();
+            System.out.println("");
+    });
+
+        // Center subpanel (transparent)
+        JPanel centerPnl = new JPanel();
+        centerPnl.setOpaque(false);
+        centerPnl.add(scrollPane);
+        centerPnl.add(chooseFolderBtn);
+
+
+        // Assemble panels
+        mainPnl.add(heading, BorderLayout.NORTH);
+        mainPnl.add(centerPnl, BorderLayout.CENTER);
+
         gui.add(mainPnl);
         gui.setVisible(true);
     }
+
+
     
 //private static final String folderPath = "C:\\Users\\Tshepo Mpofu\\Desktop\\i.am.mgt\\School\\WIL\\Files for Printing";
     private static String folderPath;
@@ -92,13 +138,13 @@ public class AutoPrintR {
                         
                         // adding the file name to the log(list of printed files)
                         appendToLogFile(file.getName());
-                        System.out.println("Existing file Successfully Printed: " + file.getName());
+                        System.out.println("Existing file Successfully Printed: " + file.getName()+"\n");
                         
-                        msgTxt.append("Existing file Successfully Printed" + file.getName());
+                        msgTxt.append("Existing file Successfully Printed : " + file.getName()+"\n");
                         
                     } catch (Exception e) {
-                        System.out.println("Failed to print existing file: " + file.getName());
-                        msgTxt.append("Failed to print existing file: " + file.getName());
+                        System.out.println("Failed to print existing file: " + file.getName()+"\n");
+                        msgTxt.append("Failed to print existing file: " + file.getName()+"\n");
                         
                         e.printStackTrace();
                     }
@@ -112,8 +158,8 @@ public class AutoPrintR {
         WatchService watchService = FileSystems.getDefault().newWatchService();
         folder.register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
         
-        System.out.println("Watching for new files in: " + folderPath);
-        msgTxt.append("Watching for new files in: " + folderPath);
+        System.out.println("Watching for new files in: " + folderPath+"\n");
+        msgTxt.append("Watching for new files in: " + folderPath+"\n");
         
         while (true) {
             WatchKey key = watchService.take();
@@ -132,11 +178,11 @@ public class AutoPrintR {
                             printedFiles.add(newFile.getName());
                             appendToLogFile(newFile.getName());
                             
-                            System.out.println("New File Successfully Printed: " + newFile.getName());
-                            msgTxt.append("New File Successfully Printed: " + newFile.getName());
+                            System.out.println("New File Successfully Printed: " + newFile.getName()+"\n");
+                            msgTxt.append("New File Successfully Printed: " + newFile.getName()+"\n");
                         } catch (Exception e) {
-                            System.out.println("Failed to print new file: " + newFile.getName());
-                            msgTxt.append("Failed to print new file: " + newFile.getName());
+                            System.out.println("Failed to print new file: " + newFile.getName()+"\n");
+                            msgTxt.append("Failed to print new file: " + newFile.getName()+"\n");
                             e.printStackTrace();
                         }
                     }
