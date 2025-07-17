@@ -4,7 +4,7 @@ jpackage code
 
 jpackage ^
   --name AutoPrintR ^
-  --input "C:\Users\Tshepo Mpofu\Desktop\i.am.mgt\School\WIL\Apps\AutoPrintRApp\AutoPrintR\dist" ^
+  --input "jar directory" ^
   --main-jar AutoPrintR.jar ^
   --main-class autoprintr.AutoPrintR ^
   --type exe ^
@@ -12,7 +12,7 @@ jpackage ^
   --win-menu ^
   --win-shortcut ^
   --verbose ^
-  --dest "C:\Users\Tshepo Mpofu\Documents\AutoPrintR_Build" ^
+  --dest "destination for the exe" ^
   --app-version "1.0.0" ^
   --vendor "TVA" ^
   --description "AutoPrintR automatically monitors and prints files from a selected folder." ^
