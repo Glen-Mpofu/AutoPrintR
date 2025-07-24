@@ -19,5 +19,8 @@ jpackage ^
   --win-dir-chooser ^
   --win-per-user-install
 
+  setting an app as a start up app
+  * shell:startup then inside the folder paste the shortcut to the app
+
 
 
