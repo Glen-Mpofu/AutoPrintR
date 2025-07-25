@@ -39,6 +39,12 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.text.DefaultCaret;
+import java.io.*;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class AutoPrintR implements ActionListener{
     //GUI Components
@@ -116,10 +122,13 @@ public class AutoPrintR implements ActionListener{
     private static String folderPath;
     private static String logFilePath;
     private static String printerFolder;
+    private static final String INSTALL_INFO_FILE = "installaltion_date.txt";
 
     public static void main(String[] args) throws Exception {
         new AutoPrintR();
 
+        installationDate();
+        
         createDirectory();
         //method that allows the user to choose a path that will contain all the files to be printed
         chooseFolderToWatch();
@@ -159,6 +168,10 @@ public class AutoPrintR implements ActionListener{
                     }
                 }
             }
+            
+            
+            
+            
         }
 
         //this section of the code is responsible for watching the folder with the files for changes and printing new files as they are added
@@ -314,7 +327,10 @@ public class AutoPrintR implements ActionListener{
 
     // Main method to print each file
     private static void printFile(File file) throws Exception {
+        
         Desktop.getDesktop().print(file);
+        getAccessedDate(file);
+
         Thread.sleep(5000); // Wait a bit between print jobs
     }
 
@@ -404,8 +420,67 @@ public class AutoPrintR implements ActionListener{
                 else{
                     System.exit(0);
                 }
+ 
             }
         }
     
     }
+    
+    private static String installationDate() throws IOException{
+        String installDate;
+        
+        String userDocs = new JFileChooser().getFileSystemView().getDefaultDirectory().getAbsolutePath();
+        
+        File installFile = new File(userDocs+"\\"+INSTALL_INFO_FILE);
+        if (readInstallDate(installFile).isBlank() || readInstallDate(installFile).isEmpty()) {
+            installDate = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            
+            
+            FileWriter fr = new FileWriter(installFile);
+            BufferedWriter wr = new BufferedWriter(fr);
+            
+            wr.write(installDate);
+            
+            System.out.println("First install. Date recorded: " + installDate);
+            wr.close();
+            
+        } else {
+            installDate = new String(Files.readAllBytes(installFile.toPath()));
+            System.out.println("Installation date: " + installDate);
+        }
+        System.out.println(installFile.getAbsolutePath());
+        return installDate;
+    }
+    
+    private static String readInstallDate(File file){
+        String installDate = "";
+        try {
+                        
+            FileReader fr = new FileReader(file);
+            BufferedReader br = new BufferedReader(fr);
+        
+            installDate = br.readLine();
+            
+            System.out.println("Saved: " + installDate);
+            
+            br.close();
+            
+        } catch (IOException ex) {
+            Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return installDate;
+    }
+    
+    private static String getAccessedDate(File file) throws IOException{
+        String accessDate = "";
+        BasicFileAttributes attrs = Files.readAttributes(file.getAbsoluteFile().toPath(), BasicFileAttributes.class);
+        FileTime lastAccessTime = attrs.lastAccessTime();
+        
+        accessDate = lastAccessTime.toString();
+        System.out.println(lastAccessTime);
+        return accessDate;
+    } 
 }
+
+
+//take the day the app was installed and use it as the start date for printing files. Only the files pasted/moved etc from the installation date shall be printed
