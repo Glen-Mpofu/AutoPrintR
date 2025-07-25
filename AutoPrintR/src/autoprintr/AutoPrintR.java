@@ -39,11 +39,12 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.text.DefaultCaret;
-import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 public class AutoPrintR implements ActionListener{
@@ -127,8 +128,6 @@ public class AutoPrintR implements ActionListener{
     public static void main(String[] args) throws Exception {
         new AutoPrintR();
 
-        installationDate();
-        
         createDirectory();
         //method that allows the user to choose a path that will contain all the files to be printed
         chooseFolderToWatch();
@@ -156,9 +155,9 @@ public class AutoPrintR implements ActionListener{
 
                         // adding the file name to the log(list of printed files)
                         appendToLogFile(normalized);
-                        System.out.println("Existing file Successfully Printed: " + file.getName());
+                        //System.out.println("File Successfully Printed: " + file.getName());
 
-                        msgTxt.append("Existing file Successfully Printed: " + file.getName() + "\n");
+                        //msgTxt.append("File Successfully Printed: " + file.getName() + "\n");
 
                     } catch (Exception e) {
                         System.out.println("Failed to print existing file: " + file.getName());
@@ -168,10 +167,6 @@ public class AutoPrintR implements ActionListener{
                     }
                 }
             }
-            
-            
-            
-            
         }
 
         //this section of the code is responsible for watching the folder with the files for changes and printing new files as they are added
@@ -199,10 +194,7 @@ public class AutoPrintR implements ActionListener{
                         try {
                             printFile(newFile);
                             printedFiles.add(normalized);
-                            appendToLogFile(normalized);
-
-                            System.out.println("New File Successfully Printed: " + newFile.getName());
-                            msgTxt.append("New File Successfully Printed: " + newFile.getName() + "\n");
+                            appendToLogFile(normalized);                            
                         } catch (Exception e) {
                             System.out.println("Failed to print new file: " + newFile.getName());
                             msgTxt.append("Failed to print new file: " + newFile.getName() + "\n");
@@ -327,9 +319,24 @@ public class AutoPrintR implements ActionListener{
 
     // Main method to print each file
     private static void printFile(File file) throws Exception {
-        
-        Desktop.getDesktop().print(file);
-        getAccessedDate(file);
+        String appInstall = installationDate();
+        LocalDateTime installLdt = LocalDateTime.parse(appInstall, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        Instant installInstant = installLdt.atZone(ZoneId.systemDefault()).toInstant();
+
+        // Retrieve file creation date
+        String creationDateStr = getCreationDate(file);
+        Instant fileCreationInstant = Instant.parse(creationDateStr);
+
+        // Retrieve file modification date
+        String modificationDateStr = getModificationDate(file);
+        Instant fileModificationInstant = Instant.parse(modificationDateStr);
+
+        // Determine if the file was created or modified after the application installation
+        if (fileCreationInstant.isAfter(installInstant) || fileModificationInstant.isAfter(installInstant)) {
+            Desktop.getDesktop().print(file);
+            System.out.println("File Successfully Printed: " + file.getName());
+            msgTxt.append("File Successfully Printed: " + file.getName() + "\n");
+        }
 
         Thread.sleep(5000); // Wait a bit between print jobs
     }
@@ -431,24 +438,28 @@ public class AutoPrintR implements ActionListener{
         
         String userDocs = new JFileChooser().getFileSystemView().getDefaultDirectory().getAbsolutePath();
         
-        File installFile = new File(userDocs+"\\"+INSTALL_INFO_FILE);
-        if (readInstallDate(installFile).isBlank() || readInstallDate(installFile).isEmpty()) {
+        File installFile = new File(userDocs+"\\AutoPrintR\\"+INSTALL_INFO_FILE);
+        
+        if(!installFile.exists()){
+            installFile.createNewFile();
+        }
+        
+        if (readInstallDate(installFile) == null) {
             installDate = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-            
             
             FileWriter fr = new FileWriter(installFile);
             BufferedWriter wr = new BufferedWriter(fr);
             
             wr.write(installDate);
             
-            System.out.println("First install. Date recorded: " + installDate);
+            //System.out.println("First install. Date recorded: " + installDate);
             wr.close();
             
         } else {
             installDate = new String(Files.readAllBytes(installFile.toPath()));
-            System.out.println("Installation date: " + installDate);
+            //System.out.println("Installation date: " + readInstallDate(installFile));
         }
-        System.out.println(installFile.getAbsolutePath());
+        //System.out.println(installFile.getAbsolutePath());
         return installDate;
     }
     
@@ -459,9 +470,8 @@ public class AutoPrintR implements ActionListener{
             FileReader fr = new FileReader(file);
             BufferedReader br = new BufferedReader(fr);
         
-            installDate = br.readLine();
-            
-            System.out.println("Saved: " + installDate);
+            installDate = br.readLine();            
+            //System.out.println("Saved: " + installDate);
             
             br.close();
             
@@ -471,15 +481,26 @@ public class AutoPrintR implements ActionListener{
         return installDate;
     }
     
-    private static String getAccessedDate(File file) throws IOException{
-        String accessDate = "";
+    private static String getCreationDate(File file) throws IOException{
+        String creationDate;
         BasicFileAttributes attrs = Files.readAttributes(file.getAbsoluteFile().toPath(), BasicFileAttributes.class);
-        FileTime lastAccessTime = attrs.lastAccessTime();
+        FileTime lastCreationTime = attrs.creationTime();
         
-        accessDate = lastAccessTime.toString();
-        System.out.println(lastAccessTime);
-        return accessDate;
-    } 
+        creationDate = lastCreationTime.toString();
+        //System.out.println(lastAccessTime);
+        return creationDate;
+    }
+    
+    private static String getModificationDate(File file) throws IOException{
+        String modificationDate;
+        BasicFileAttributes attrs = Files.readAttributes(file.getAbsoluteFile().toPath(), BasicFileAttributes.class);
+        FileTime lastModifTime = attrs.lastModifiedTime();
+        
+        modificationDate = lastModifTime.toString();
+        //System.out.println(lastAccessTime);
+        return modificationDate;
+    }
+
 }
 
 
