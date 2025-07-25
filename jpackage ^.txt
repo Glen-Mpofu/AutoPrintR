@@ -1,0 +1,35 @@
+Code
+
+set PATH=C:\Program Files\Java\jdk-19\bin;%PATH%
+
+wix tools = https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+
+Unzip the binary and move it to your C:\Wix\
+*candle.exe
+*light.exe
+
+set PATH=C:Wix\wixbinaries\;%PATH%
+
+jpackage ^
+  --name AutoPrintR ^
+  --input "C:\Users\Star Schools\Documents\AutoPrintR-main\AutoPrintR\dist" ^
+  --main-jar AutoPrintR.jar ^
+  --main-class autoprintr.AutoPrintR ^
+  --type exe ^
+  --java-options "-Xmx512m" ^
+  --win-menu ^
+  --win-shortcut ^
+  --verbose ^
+  --dest "C:\Users\Star Schools\Documents\AutoPrintR_Build" ^
+  --app-version "1.0.0" ^
+  --vendor "TVA" ^
+  --description "AutoPrintR automatically monitors and prints files from a selected folder." ^
+  --win-dir-chooser ^
+  --win-per-user-install ^
+  --icon "C:\Users\Star Schools\Documents\AutoPrintR-main\AutoPrintR\src\resources\AutoPrintR Logo Design.ico"
+
+
+
+start up
+shell:startup
+place the Autoprintr app inside
