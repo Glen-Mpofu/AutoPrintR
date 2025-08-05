@@ -2,14 +2,21 @@ package autoprintr;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
+import java.awt.print.Printable;
+import java.awt.print.PrinterJob;
 import java.io.*;
 import java.net.URL;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import static java.rmi.server.LogStream.log;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.logging.*;
+import javax.imageio.ImageIO;
+import javax.print.PrintService;
+import javax.print.PrintServiceLookup;
 import javax.swing.*;
 import javax.swing.text.DefaultCaret;
 
@@ -32,6 +39,7 @@ public class AutoPrintR implements ActionListener {
         gui.setLocationRelativeTo(null);
         gui.setResizable(false);
 
+        gui.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         try {
             URL iconURL = getClass().getResource("/resources/AutoPrintR Logo Design.png");
             if (iconURL != null) {
@@ -59,7 +67,7 @@ public class AutoPrintR implements ActionListener {
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 
         descTxt = new JTextArea(4, 30);
-        descTxt.setText("AutoPrintR automatically prints files copied to your selected folder.");
+        descTxt.setText("AutoPrintR automatically prints files copied/moved/edited/saved to a folder of thy choice.");
         descTxt.setEditable(false);
         descTxt.setWrapStyleWord(true);
         descTxt.setLineWrap(true);
@@ -135,25 +143,72 @@ public class AutoPrintR implements ActionListener {
         }
     }
 
-    private static void printFileIfNew(File file, Instant installInstant) throws Exception {
-        try {
-            BasicFileAttributes attrs = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+    private static void printFileIfNew(File file, Instant installInstant) throws InterruptedException, IOException {
+        
+        BasicFileAttributes attrs = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
             Instant created = attrs.creationTime().toInstant();
             Instant modified = attrs.lastModifiedTime().toInstant();
 
-            if (created.isAfter(installInstant) || modified.isAfter(installInstant)) {
-                Desktop.getDesktop().print(file);
+        if (created.isAfter(installInstant) || modified.isAfter(installInstant)) {
+                String ext = getFileExtension(file);
+            try {
+                switch (ext) {
+                    case "pdf":
+                        printWithSumatra(file);
+                        break;
+                    case "doc": case "docx": case "xls": case "xlsx": case "ppt": case "pptx":
+                        printWithOffice(file);
+                        break;
+                    case "txt":
+                        Desktop.getDesktop().print(file);
+                        break;
+                    case "jpg": case "jpeg": case "png": case "bmp":
+                        printImage(file);
+                        break;
+                    default:
+                        Desktop.getDesktop().print(file);
+                    }
+                } catch (Exception e) {
+                    log("❌ Error printing: " + file.getName());
+                    log(e.getMessage());
+                }
                 msgTxt.append("Printed: " + file.getName() + "\n");
                 Thread.sleep(5000);
+                
             } else {
                 msgTxt.append("Skipped (too old): " + file.getName() + "\n");
             }
-        } catch (Exception e) {
-            msgTxt.append("Error checking date, printing anyway: " + file.getName() + "\n");
-            Desktop.getDesktop().print(file);
-        }
     }
-
+    
+    private static void printWithSumatra(File file) throws IOException {
+        File sumatra = new File("tools/SumatraPDF.exe");
+        if (!sumatra.exists()) throw new IOException("SumatraPDF not found.");
+        Runtime.getRuntime().exec("\"" + sumatra.getAbsolutePath() + "\" -print-to-default \"" + file.getAbsolutePath() + "\"");
+        log("✅ PDF sent to printer: " + file.getName());
+    }
+    
+    private static void printWithOffice(File file) throws IOException {
+        File script = new File("tools/print_office.ps1");
+        if (!script.exists()) throw new IOException("PowerShell script not found.");
+        Runtime.getRuntime().exec("powershell.exe -ExecutionPolicy Bypass -File \"" + script.getAbsolutePath() + "\" \"" + file.getAbsolutePath() + "\"");
+        log("✅ Office document sent to printer: " + file.getName());
+    }
+    
+    private static void printImage(File file) throws Exception {
+        BufferedImage image = ImageIO.read(file);
+        PrintService defaultPrinter = PrintServiceLookup.lookupDefaultPrintService();
+        if (defaultPrinter == null) throw new IOException("No default printer found.");
+        PrinterJob job = PrinterJob.getPrinterJob();
+        job.setPrintService(defaultPrinter);
+        job.setPrintable((g, pf, pageIndex) -> {
+            if (pageIndex > 0) return Printable.NO_SUCH_PAGE;
+            g.drawImage(image, 100, 100, null);
+            return Printable.PAGE_EXISTS;
+        });
+        job.print();
+        log("✅ Image printed: " + file.getName());
+    }
+    
     private static void createDirectory() {
         try {
             String userDocs = new JFileChooser().getFileSystemView().getDefaultDirectory().getAbsolutePath();
@@ -255,6 +310,25 @@ public class AutoPrintR implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (e.getSource() == chooseFolderBtn) chooseFolderToWatch();
+        if (e.getSource() == chooseFolderBtn) {          
+
+            boolean chosen = false;
+            while (!chosen) {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setDialogTitle("Select Folder to Watch");
+                chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    File selected = chooser.getSelectedFile();
+                    int confirm = JOptionPane.showConfirmDialog(null, "Use this folder?\n" + selected.getAbsolutePath());
+                    if (confirm == 0) {
+                        folderPath = selected.getAbsolutePath();
+                        saveDirectory(folderPath);
+                        chosen = true;
+                    }
+                } else {
+                    System.exit(0);
+                }
+            }
+        }
     }
 }
