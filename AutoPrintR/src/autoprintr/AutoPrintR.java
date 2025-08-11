@@ -9,7 +9,6 @@ import java.io.*;
 import java.net.URL;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import static java.rmi.server.LogStream.log;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -169,8 +168,8 @@ public class AutoPrintR implements ActionListener {
                         Desktop.getDesktop().print(file);
                     }
                 } catch (Exception e) {
-                    log("❌ Error printing: " + file.getName());
-                    log(e.getMessage());
+                    msgTxt.append("❌ Error printing: " + file.getName());
+                    msgTxt.append(e.getMessage());
                 }
                 msgTxt.append("Printed: " + file.getName() + "\n");
                 Thread.sleep(5000);
@@ -181,17 +180,21 @@ public class AutoPrintR implements ActionListener {
     }
     
     private static void printWithSumatra(File file) throws IOException {
-        File sumatra = new File("tools/SumatraPDF.exe");
-        if (!sumatra.exists()) throw new IOException("SumatraPDF not found.");
+        String basePath = getAppBasePath();
+        msgTxt.append(basePath);
+        File sumatra = new File(basePath + "/app/tools/SumatraPDF.exe");
+        if (!sumatra.exists()) throw new IOException("SumatraPDF not found at " + sumatra.getAbsolutePath());
         Runtime.getRuntime().exec("\"" + sumatra.getAbsolutePath() + "\" -print-to-default \"" + file.getAbsolutePath() + "\"");
-        log("✅ PDF sent to printer: " + file.getName());
+        msgTxt.append("✅ PDF sent to printer: " + file.getName() + "\n");
     }
     
     private static void printWithOffice(File file) throws IOException {
-        File script = new File("tools/print_office.ps1");
+        String basePath = getAppBasePath();
+        File script = new File(basePath + "/app/tools/print_office.ps1");
+        msgTxt.append(script.getAbsolutePath());
         if (!script.exists()) throw new IOException("PowerShell script not found.");
         Runtime.getRuntime().exec("powershell.exe -ExecutionPolicy Bypass -File \"" + script.getAbsolutePath() + "\" \"" + file.getAbsolutePath() + "\"");
-        log("✅ Office document sent to printer: " + file.getName());
+        msgTxt.append("✅ Office document sent to printer: " + file.getName());
     }
     
     private static void printImage(File file) throws Exception {
@@ -206,7 +209,7 @@ public class AutoPrintR implements ActionListener {
             return Printable.PAGE_EXISTS;
         });
         job.print();
-        log("✅ Image printed: " + file.getName());
+        msgTxt.append("✅ Image printed: " + file.getName());
     }
     
     private static void createDirectory() {
@@ -288,8 +291,11 @@ public class AutoPrintR implements ActionListener {
     }
 
     private static String getFileExtension(File file) {
-        int i = file.getName().lastIndexOf(".");
-        return i >= 0 ? file.getName().substring(i + 1).toLowerCase() : "";
+        String name = file.getName();
+        int lastIndex = name.lastIndexOf('.');
+        if (lastIndex == -1) return "";
+        System.out.println(name.substring(lastIndex + 1));
+        return name.substring(lastIndex + 1);
     }
 
     private static Set<String> loadPrintedFiles() {
@@ -330,5 +336,9 @@ public class AutoPrintR implements ActionListener {
                 }
             }
         }
+    }
+    
+    public static String getAppBasePath() {
+        return System.getProperty("user.dir");
     }
 }
