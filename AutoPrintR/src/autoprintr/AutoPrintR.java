@@ -6,6 +6,7 @@ import java.awt.image.BufferedImage;
 import java.awt.print.Printable;
 import java.awt.print.PrinterJob;
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -29,16 +30,22 @@ public class AutoPrintR implements ActionListener {
     private static String folderPath;
     private static String logFilePath;
     private static String printerFolder;
+    private static String portFolder;
     private static final String INSTALL_INFO_FILE = "installation_date.txt";
 
+    private TrayIcon trayIcon;
+    
+    private static ServerSocket lockSocket;
+    private static int PORT_NUMBER; 
+    
     public AutoPrintR() {
         gui = new JFrame("AutoPrintR");
         gui.setSize(450, 480);
-        gui.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        gui.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+        
         gui.setLocationRelativeTo(null);
         gui.setResizable(false);
 
-        gui.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         try {
             URL iconURL = getClass().getResource("/resources/AutoPrintR Logo Design.png");
             if (iconURL != null) {
@@ -51,6 +58,21 @@ public class AutoPrintR implements ActionListener {
             e.printStackTrace();
         }
 
+        gui.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if(gui.isVisible() == false){
+                    gui.setVisible(true);
+                }
+                
+                if (SystemTray.isSupported() && trayIcon != null) {
+                    trayIcon.displayMessage("AutoPrintR",
+                            "App is minimized to tray. Right-click to open or exit.",
+                            TrayIcon.MessageType.INFO);
+                }
+            }
+        });        
+        
         JLabel heading = new JLabel("Automate Your Prints", JLabel.CENTER);
         heading.setFont(new Font("SansSerif", Font.BOLD, 18));
         heading.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
@@ -82,11 +104,72 @@ public class AutoPrintR implements ActionListener {
         mainPnl.add(heading, BorderLayout.NORTH);
         mainPnl.add(centerPnl, BorderLayout.CENTER);
         gui.add(mainPnl);
-        gui.setVisible(true);
+        
+        if(gui.isVisible() == false){
+            gui.setVisible(true);
+        }
+        
+        setupTrayIcon();
     }
 
-    public static void main(String[] args) throws Exception {
+    private static boolean checkIfRunning() {
+        try {            
+            readPortNumber();
+            // Use a hard-coded port number (should be unique to your app)
+            lockSocket = new ServerSocket(PORT_NUMBER);
+            return false; // No other instance running
+        } catch (IOException e) {
+            // Port is already in use
+            return true;
+        }
+    }
+    
+    public static void readPortNumber()
+    {
+        try {
+            FileReader fr = new FileReader(portFolder);
+            BufferedReader br = new BufferedReader(fr);
+            
+            PORT_NUMBER = Integer.parseInt(br.readLine());
+            
+            br.close();
+            fr.close();
+        } catch (IOException ex) {
+            Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, ex);
+        }        
+    }
+    
+    public static void savePortNumber(){        
+        try {
+            String basePath = getAppBasePath() ;
+            File portFile = new File(basePath, "port_number.txt");
+            if(!portFile.exists()) portFile.createNewFile();
+            
+            portFolder = portFile.getAbsolutePath();
+            
+            FileWriter fw = new FileWriter(portFile);
+            BufferedWriter bw = new BufferedWriter(fw);
+            
+            bw.write(String.valueOf(65432));
+            
+            bw.close();
+            fw.close();
+        } catch (IOException ex) {
+            Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, ex);
+        }        
+    }
+    
+    public static void main(String[] args) throws Exception {        
+        savePortNumber();
+        
+        if (checkIfRunning()) {
+            JOptionPane.showMessageDialog(null, "AutoPrintR is already running. Check the 'System Tray' ", 
+                    "Already Running", 
+                    JOptionPane.INFORMATION_MESSAGE);
+            System.exit(0);
+        }
         new AutoPrintR();
+        
         createDirectory();
         String installStr = installationDate().trim();
         LocalDateTime installTime = LocalDateTime.parse(installStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
@@ -142,6 +225,53 @@ public class AutoPrintR implements ActionListener {
         }
     }
 
+    private void setupTrayIcon() {
+        if (!SystemTray.isSupported()) {
+            msgTxt.append("System tray is not supported on this platform.\n");
+            return;
+        }
+
+        SystemTray tray = SystemTray.getSystemTray();
+        Image image = Toolkit.getDefaultToolkit().getImage(getClass().getResource("/resources/AutoPrintR Logo Design.png"));
+
+        PopupMenu popup = new PopupMenu();
+
+        MenuItem showItem = new MenuItem("Show");
+        showItem.addActionListener(e -> {
+            if(gui.isVisible() == false){
+                gui.setVisible(true);
+            }
+            gui.setExtendedState(JFrame.NORMAL);
+            gui.toFront();
+        });
+
+        MenuItem exitItem = new MenuItem("Exit");
+        exitItem.addActionListener(e -> {
+            tray.remove(trayIcon);
+            System.exit(0);
+        });
+
+        popup.add(showItem);
+        popup.add(exitItem);
+
+        trayIcon = new TrayIcon(image, "AutoPrintR", popup);
+        trayIcon.setImageAutoSize(true);
+
+        trayIcon.addActionListener(e -> {
+            if(gui.isVisible() == false){
+                gui.setVisible(true);
+            }
+            gui.setExtendedState(JFrame.NORMAL);
+            gui.toFront();
+        });
+
+        try {
+            tray.add(trayIcon);
+        } catch (AWTException e) {
+            msgTxt.append("Failed to add to system tray.\n");
+        }
+    }
+    
     private static void printFileIfNew(File file, Instant installInstant) throws InterruptedException, IOException {
         
         BasicFileAttributes attrs = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
@@ -222,7 +352,7 @@ public class AutoPrintR implements ActionListener {
             File folderFile = new File(baseFolder, "printer_folder_directory.txt");
             if (!logFile.exists()) logFile.createNewFile();
             if (!folderFile.exists()) folderFile.createNewFile();
-
+            
             logFilePath = logFile.getAbsolutePath();
             printerFolder = folderFile.getAbsolutePath();
         } catch (IOException e) {
