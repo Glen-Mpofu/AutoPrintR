@@ -1,0 +1,474 @@
+package autoprintr;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.image.BufferedImage;
+import java.awt.print.Printable;
+import java.awt.print.PrinterJob;
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.URL;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.logging.*;
+import javax.imageio.ImageIO;
+import javax.print.PrintService;
+import javax.print.PrintServiceLookup;
+import javax.swing.*;
+import javax.swing.text.DefaultCaret;
+
+public class AutoPrintR implements ActionListener {
+    private JFrame gui;
+    private JPanel mainPnl;
+    private static JTextArea msgTxt;
+    private static JTextArea descTxt;
+    private JButton chooseFolderBtn;
+
+    private static String folderPath;
+    private static String logFilePath;
+    private static String printerFolder;
+    private static String portFolder;
+    private static final String INSTALL_INFO_FILE = "installation_date.txt";
+
+    private TrayIcon trayIcon;
+    
+    private static ServerSocket lockSocket;
+    private static int PORT_NUMBER; 
+    
+    public AutoPrintR() {
+        gui = new JFrame("AutoPrintR");
+        gui.setSize(450, 480);
+        gui.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+        
+        gui.setLocationRelativeTo(null);
+        gui.setResizable(false);
+
+        try {
+            URL iconURL = getClass().getResource("/resources/AutoPrintR Logo Design.png");
+            if (iconURL != null) {
+                Image icon = Toolkit.getDefaultToolkit().getImage(iconURL);
+                gui.setIconImage(icon);
+            } else {
+                System.err.println("Icon not found.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        gui.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if(gui.isVisible() == false){
+                    gui.setVisible(true);
+                }
+                
+                if (SystemTray.isSupported() && trayIcon != null) {
+                    trayIcon.displayMessage("AutoPrintR",
+                            "App is minimized to tray. Right-click to open or exit.",
+                            TrayIcon.MessageType.INFO);
+                }
+            }
+        });        
+        
+        JLabel heading = new JLabel("Automate Your Prints", JLabel.CENTER);
+        heading.setFont(new Font("SansSerif", Font.BOLD, 18));
+        heading.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+
+        mainPnl = new JPanel(new BorderLayout());
+
+        msgTxt = new JTextArea(15, 30);
+        msgTxt.setEditable(false);
+        msgTxt.setLineWrap(true);
+        msgTxt.setWrapStyleWord(true);
+        JScrollPane scrollPane = new JScrollPane(msgTxt);
+        DefaultCaret caret = (DefaultCaret) msgTxt.getCaret();
+        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+
+        descTxt = new JTextArea(4, 30);
+        descTxt.setText("AutoPrintR automatically prints files copied/moved/edited/saved to a folder of thy choice.");
+        descTxt.setEditable(false);
+        descTxt.setWrapStyleWord(true);
+        descTxt.setLineWrap(true);
+
+        chooseFolderBtn = new JButton("Choose/Change Folder");
+        chooseFolderBtn.addActionListener(this);
+
+        JPanel centerPnl = new JPanel();
+        centerPnl.add(scrollPane);
+        centerPnl.add(chooseFolderBtn);
+        centerPnl.add(descTxt);
+
+        mainPnl.add(heading, BorderLayout.NORTH);
+        mainPnl.add(centerPnl, BorderLayout.CENTER);
+        gui.add(mainPnl);
+        
+        if(gui.isVisible() == false){
+            gui.setVisible(true);
+        }
+        
+        setupTrayIcon();
+    }
+
+    private static boolean checkIfRunning() {
+        try {            
+            readPortNumber();
+            // Use a hard-coded port number (should be unique to your app)
+            lockSocket = new ServerSocket(PORT_NUMBER);
+            return false; // No other instance running
+        } catch (IOException e) {
+            // Port is already in use
+            return true;
+        }
+    }
+    
+    public static void readPortNumber()
+    {
+        try {
+            FileReader fr = new FileReader(portFolder);
+            BufferedReader br = new BufferedReader(fr);
+            
+            PORT_NUMBER = Integer.parseInt(br.readLine());
+            
+            br.close();
+            fr.close();
+        } catch (IOException ex) {
+            Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, ex);
+        }        
+    }
+    
+    public static void savePortNumber(){        
+        try {
+            String basePath = getAppBasePath() ;
+            File portFile = new File(basePath, "port_number.txt");
+            if(!portFile.exists()) portFile.createNewFile();
+            
+            portFolder = portFile.getAbsolutePath();
+            
+            FileWriter fw = new FileWriter(portFile);
+            BufferedWriter bw = new BufferedWriter(fw);
+            
+            bw.write(String.valueOf(65432));
+            
+            bw.close();
+            fw.close();
+        } catch (IOException ex) {
+            Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, ex);
+        }        
+    }
+    
+    public static void main(String[] args) throws Exception {        
+        savePortNumber();
+        
+        if (checkIfRunning()) {
+            JOptionPane.showMessageDialog(null, "AutoPrintR is already running. Check the 'System Tray' ", 
+                    "Already Running", 
+                    JOptionPane.INFORMATION_MESSAGE);
+            System.exit(0);
+        }
+        new AutoPrintR();
+        
+        createDirectory();
+        String installStr = installationDate().trim();
+        LocalDateTime installTime = LocalDateTime.parse(installStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        Instant installInstant = installTime.atZone(ZoneId.systemDefault()).toInstant();
+
+        chooseFolderToWatch();
+
+        Set<String> printedFiles = loadPrintedFiles();
+        File dir = new File(folderPath);
+        File[] files = dir.listFiles();
+
+        if (files != null) {
+            for (File file : files) {
+                String name = file.getName().trim().toLowerCase();
+                if (file.isFile() && isPrintable(file) && !printedFiles.contains(name)) {
+                    try {
+                        printFileIfNew(file, installInstant);
+                        printedFiles.add(name);
+                        appendToLogFile(name);
+                    } catch (Exception e) {
+                        msgTxt.append("Failed to print existing file: " + file.getName() + "\n");
+                    }
+                }
+            }
+        }
+
+        Path folder = Paths.get(folderPath);
+        WatchService watchService = FileSystems.getDefault().newWatchService();
+        folder.register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
+        msgTxt.append("Watching for new files in: " + folderPath + "\n");
+
+        while (true) {
+            WatchKey key = watchService.take();
+            for (WatchEvent<?> event : key.pollEvents()) {
+                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                    Path newPath = folder.resolve((Path) event.context());
+                    File file = newPath.toFile();
+                    Thread.sleep(1000);
+                    String name = file.getName().trim().toLowerCase();
+
+                    if (file.isFile() && isPrintable(file) && !printedFiles.contains(name)) {
+                        try {
+                            printFileIfNew(file, installInstant);
+                            printedFiles.add(name);
+                            appendToLogFile(name);
+                        } catch (Exception e) {
+                            msgTxt.append("Failed to print new file: " + file.getName() + "\n");
+                        }
+                    }
+                }
+            }
+            if (!key.reset()) break;
+        }
+    }
+
+    private void setupTrayIcon() {
+        if (!SystemTray.isSupported()) {
+            msgTxt.append("System tray is not supported on this platform.\n");
+            return;
+        }
+
+        SystemTray tray = SystemTray.getSystemTray();
+        Image image = Toolkit.getDefaultToolkit().getImage(getClass().getResource("/resources/AutoPrintR Logo Design.png"));
+
+        PopupMenu popup = new PopupMenu();
+
+        MenuItem showItem = new MenuItem("Show");
+        showItem.addActionListener(e -> {
+            if(gui.isVisible() == false){
+                gui.setVisible(true);
+            }
+            gui.setExtendedState(JFrame.NORMAL);
+            gui.toFront();
+        });
+
+        MenuItem exitItem = new MenuItem("Exit");
+        exitItem.addActionListener(e -> {
+            tray.remove(trayIcon);
+            System.exit(0);
+        });
+
+        popup.add(showItem);
+        popup.add(exitItem);
+
+        trayIcon = new TrayIcon(image, "AutoPrintR", popup);
+        trayIcon.setImageAutoSize(true);
+
+        trayIcon.addActionListener(e -> {
+            if(gui.isVisible() == false){
+                gui.setVisible(true);
+            }
+            gui.setExtendedState(JFrame.NORMAL);
+            gui.toFront();
+        });
+
+        try {
+            tray.add(trayIcon);
+        } catch (AWTException e) {
+            msgTxt.append("Failed to add to system tray.\n");
+        }
+    }
+    
+    private static void printFileIfNew(File file, Instant installInstant) throws InterruptedException, IOException {
+        
+        BasicFileAttributes attrs = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+            Instant created = attrs.creationTime().toInstant();
+            Instant modified = attrs.lastModifiedTime().toInstant();
+
+        if (created.isAfter(installInstant) || modified.isAfter(installInstant)) {
+                String ext = getFileExtension(file);
+            try {
+                switch (ext) {
+                    case "pdf":
+                        printWithSumatra(file);
+                        break;
+                    case "doc": case "docx": case "xls": case "xlsx": case "ppt": case "pptx":
+                        printWithOffice(file);
+                        break;
+                    case "txt":
+                        Desktop.getDesktop().print(file);
+                        break;
+                    case "jpg": case "jpeg": case "png": case "bmp":
+                        printImage(file);
+                        break;
+                    default:
+                        Desktop.getDesktop().print(file);
+                    }
+                } catch (Exception e) {
+                    msgTxt.append("❌ Error printing: " + file.getName());
+                    msgTxt.append(e.getMessage());
+                }
+                msgTxt.append("Printed: " + file.getName() + "\n");
+                Thread.sleep(5000);
+                
+            } else {
+                msgTxt.append("Skipped (too old): " + file.getName() + "\n");
+            }
+    }
+    
+    private static void printWithSumatra(File file) throws IOException {
+        String basePath = getAppBasePath();
+        msgTxt.append(basePath);
+        File sumatra = new File(basePath + "/app/tools/SumatraPDF.exe");
+        if (!sumatra.exists()) throw new IOException("SumatraPDF not found at " + sumatra.getAbsolutePath());
+        Runtime.getRuntime().exec("\"" + sumatra.getAbsolutePath() + "\" -print-to-default \"" + file.getAbsolutePath() + "\"");
+        msgTxt.append("✅ PDF sent to printer: " + file.getName() + "\n");
+    }
+    
+    private static void printWithOffice(File file) throws IOException {
+        String basePath = getAppBasePath();
+        File script = new File(basePath + "/app/tools/print_office.ps1");
+        msgTxt.append(script.getAbsolutePath());
+        if (!script.exists()) throw new IOException("PowerShell script not found.");
+        Runtime.getRuntime().exec("powershell.exe -ExecutionPolicy Bypass -File \"" + script.getAbsolutePath() + "\" \"" + file.getAbsolutePath() + "\"");
+        msgTxt.append("✅ Office document sent to printer: " + file.getName());
+    }
+    
+    private static void printImage(File file) throws Exception {
+        BufferedImage image = ImageIO.read(file);
+        PrintService defaultPrinter = PrintServiceLookup.lookupDefaultPrintService();
+        if (defaultPrinter == null) throw new IOException("No default printer found.");
+        PrinterJob job = PrinterJob.getPrinterJob();
+        job.setPrintService(defaultPrinter);
+        job.setPrintable((g, pf, pageIndex) -> {
+            if (pageIndex > 0) return Printable.NO_SUCH_PAGE;
+            g.drawImage(image, 100, 100, null);
+            return Printable.PAGE_EXISTS;
+        });
+        job.print();
+        msgTxt.append("✅ Image printed: " + file.getName());
+    }
+    
+    private static void createDirectory() {
+        try {
+            String userDocs = new JFileChooser().getFileSystemView().getDefaultDirectory().getAbsolutePath();
+            File baseFolder = new File(userDocs, "AutoPrintR");
+            if (!baseFolder.exists()) baseFolder.mkdirs();
+
+            File logFile = new File(baseFolder, "printed_files.txt");
+            File folderFile = new File(baseFolder, "printer_folder_directory.txt");
+            if (!logFile.exists()) logFile.createNewFile();
+            if (!folderFile.exists()) folderFile.createNewFile();
+            
+            logFilePath = logFile.getAbsolutePath();
+            printerFolder = folderFile.getAbsolutePath();
+        } catch (IOException e) {
+            Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, e);
+        }
+    }
+
+    private static String installationDate() throws IOException {
+        String userDocs = new JFileChooser().getFileSystemView().getDefaultDirectory().getAbsolutePath();
+        File file = new File(userDocs + File.separator + "AutoPrintR" + File.separator + INSTALL_INFO_FILE);
+        if (!file.exists()) {
+            String now = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            try (BufferedWriter w = new BufferedWriter(new FileWriter(file))) {
+                w.write(now);
+            }
+            return now;
+        }
+        return Files.readAllLines(file.toPath()).get(0);
+    }
+
+    private static void chooseFolderToWatch() {
+        String saved = readDirectory();
+        if (saved != null && !saved.trim().isEmpty()) {
+            folderPath = saved.trim();
+            return;
+        }
+
+        boolean chosen = false;
+        while (!chosen) {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setDialogTitle("Select Folder to Watch");
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                File selected = chooser.getSelectedFile();
+                int confirm = JOptionPane.showConfirmDialog(null, "Use this folder?\n" + selected.getAbsolutePath());
+                if (confirm == 0) {
+                    folderPath = selected.getAbsolutePath();
+                    saveDirectory(folderPath);
+                    chosen = true;
+                }
+            } else {
+                System.exit(0);
+            }
+        }
+    }
+
+    private static void saveDirectory(String dir) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(printerFolder))) {
+            bw.write(dir.trim());
+        } catch (IOException e) {
+            Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, e);
+        }
+    }
+
+    private static String readDirectory() {
+        try (BufferedReader br = new BufferedReader(new FileReader(printerFolder))) {
+            return br.readLine();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static boolean isPrintable(File file) {
+        String name = file.getName().toLowerCase();
+        return !name.startsWith("~$") && Set.of("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "jpg", "jpeg", "png", "bmp").contains(getFileExtension(file));
+    }
+
+    private static String getFileExtension(File file) {
+        String name = file.getName();
+        int lastIndex = name.lastIndexOf('.');
+        if (lastIndex == -1) return "";
+        System.out.println(name.substring(lastIndex + 1));
+        return name.substring(lastIndex + 1);
+    }
+
+    private static Set<String> loadPrintedFiles() {
+        Set<String> printed = new HashSet<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(logFilePath))) {
+            String line;
+            while ((line = br.readLine()) != null) printed.add(line.trim().toLowerCase());
+        } catch (IOException ignored) {}
+        return printed;
+    }
+
+    private static void appendToLogFile(String fileName) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFilePath, true))) {
+            writer.write(fileName);
+            writer.newLine();
+        } catch (IOException ignored) {}
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == chooseFolderBtn) {          
+
+            boolean chosen = false;
+            while (!chosen) {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setDialogTitle("Select Folder to Watch");
+                chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    File selected = chooser.getSelectedFile();
+                    int confirm = JOptionPane.showConfirmDialog(null, "Use this folder?\n" + selected.getAbsolutePath());
+                    if (confirm == 0) {
+                        folderPath = selected.getAbsolutePath();
+                        saveDirectory(folderPath);
+                        chosen = true;
+                    }
+                } else {
+                    System.exit(0);
+                }
+            }
+        }
+    }
+    
+    public static String getAppBasePath() {
+        return System.getProperty("user.dir");
+    }
+}

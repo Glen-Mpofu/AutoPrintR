@@ -1,0 +1,19 @@
+AutoPrintR is a proprietary software product. Unauthorized reproduction, distribution, reverse-engineering, modification, or resale of this application is strictly prohibited and may result in legal action under applicable laws.
+
+By installing and using AutoPrintR, you agree to the following terms:
+
+You may use this software for personal or internal business purposes only.
+
+You may not decompile, disassemble, or reverse-engineer any part of the software.
+
+Redistribution, either in original or modified form, is not allowed without explicit written permission from the developers.
+
+You may not use this software to offer commercial printing services unless granted a commercial license.
+
+The developers of AutoPrintR are not responsible for any data loss, printing errors, or damages arising from the use or misuse of the application.
+
+For issues email: mpofuglen23@gmail.com or vutlhari23maswanganyi@gmail.com
+
+Or visit: https://github.com/Glen-Mpofu/AutoPrintR/issues
+
+All rights reserved © 2025 Glen Mpofu & Vutlhari Maswanganyi
