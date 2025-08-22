@@ -22,24 +22,33 @@ import javax.swing.text.DefaultCaret;
 
 public class AutoPrintR implements ActionListener {
     
+    //panels and frames
     private JFrame gui;
     private JPanel mainPnl;
+    
+    //log txt files
     private static JTextArea msgTxt;
     private static JTextArea descTxt;
     private JButton chooseFolderBtn;
+    
+    //locations and files
     private static String folderPath;
     private static String logFilePath;
     private static String printerFolder;
     private static String portFolder;
+    private static File defaultNumCopiesFolder = new File(getAppBasePath(),"default_num_copies.txt");    
     private static final String INSTALL_INFO_FILE = "installation_date.txt";
+    
     private TrayIcon trayIcon;    
+    
+    //port information
     private static ServerSocket lockSocket;
     private static int PORT_NUMBER; 
     
+    //copies information
     private JComboBox copiesListBox;
-    private static int copiesPerDocument = 3;
+    private static int copiesPerDocument = 3;    
     
-    private static File defaultNumCopiesFolder = new File(getAppBasePath(),"default_num_copies.txt");
     //this is our user interface
     public AutoPrintR() {
         
@@ -262,10 +271,7 @@ public class AutoPrintR implements ActionListener {
                     if (file.isFile() && isPrintable(file) && !printedFiles.contains(name)) {
                         try {
                             printFileIfNew(file, installInstant);
-                            printedFiles.add(name);
-                            
-                            
-                            
+                            printedFiles.add(name); 
                         } catch (Exception e) {
                             msgTxt.append("Failed to print new file: " + file.getName() + "\n");
                         }
@@ -399,7 +405,6 @@ public class AutoPrintR implements ActionListener {
         }
         
         //C:\Users\Reception\OneDrive - Tshwane University of Technology\Desktop\Tshepo\AutoPrintR\AutoPrintR\dist\tools\SumatraPDF.exe
-        //lOOP FOR PRINTING 3 TIMES
         for (int i = 0; i < copiesPerDocument; i++) {
             Runtime.getRuntime().exec("\"" + sumatra.getAbsolutePath() + "\" -print-to-default \"" + file.getAbsolutePath() + "\"");      
             System.out.println("Pdf Logging: "+file.getAbsolutePath());  
