@@ -20,6 +20,8 @@ import javax.print.PrintServiceLookup;
 import javax.swing.*;
 import javax.swing.text.DefaultCaret;
 
+
+//add a log file. change location of the file from documents to ProgramData
 public class AutoPrintR implements ActionListener {
     
     //panels and frames
@@ -32,8 +34,8 @@ public class AutoPrintR implements ActionListener {
     private JButton chooseFolderBtn;
     
     //locations and files
-    private static String folderPath;
-    private static String logFilePath;
+    private static String watchFolder;
+    private static String printedFilesLogFilePath;
     private static String printerFolder;
     private static String portFolder;
     private static File defaultNumCopiesFolder = new File(getAppBasePath(),"default_num_copies.txt");    
@@ -48,6 +50,8 @@ public class AutoPrintR implements ActionListener {
     //copies information
     private JComboBox copiesListBox;
     private static int copiesPerDocument = 3;    
+    
+    private static String progDataFolder = System.getenv("ProgramData");
     
     //this is our user interface
     public AutoPrintR() {
@@ -181,8 +185,15 @@ public class AutoPrintR implements ActionListener {
     public static void savePortNumber(){    
         // It saves the port number inside the port_number.txt file
         try {
-            String basePath = getAppBasePath() ;
-            File portFile = new File(basePath, "port_number.txt");
+            String localAppData  = System.getenv("LOCALAPPDATA");
+            
+            File localAPFolder = new File(localAppData,"AutoPrintR");
+            if (!localAPFolder.exists()) {
+                localAPFolder.mkdir();
+            }
+            
+            File portFile = new File(localAPFolder+"/", "port_number.txt");            
+            
             if(!portFile.exists()) portFile.createNewFile();
             
             portFolder = portFile.getAbsolutePath();
@@ -218,7 +229,7 @@ public class AutoPrintR implements ActionListener {
         //Initializing the UI
         new AutoPrintR();
         
-        createDirectory();
+        createLogFolderDirectory();
         
         //gets the installation date and converts it to an Instant
         String installStr = installationDate().trim();
@@ -230,7 +241,7 @@ public class AutoPrintR implements ActionListener {
         
         //Loading the files that have been printed
         Set<String> printedFiles = loadPrintedFiles();
-        File dir = new File(folderPath);
+        File dir = new File(watchFolder);
         File[] files = dir.listFiles();
 
         if (files != null) { 
@@ -249,13 +260,12 @@ public class AutoPrintR implements ActionListener {
         }
         
         //gets the folder the user choose as the watch folder and initializes a Watch Event over it to track any changes like a file being added/pasted or modified in the folder
-        Path folder = Paths.get(folderPath);
-        
+        Path folder = Paths.get(watchFolder);        
         
         WatchService watchService = FileSystems.getDefault().newWatchService();
         
         folder.register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
-        msgTxt.append("Watching for new files in: " + folderPath + "\n");
+        msgTxt.append("Watching for new files in: " + watchFolder + "\n");
 
         while (true) {
             WatchKey key = watchService.take();
@@ -464,11 +474,11 @@ public class AutoPrintR implements ActionListener {
         msgTxt.append("✅ Image printed: " + file.getName() + "\n");
     }
     
-    private static void createDirectory() {
+    private static void createLogFolderDirectory() {
         //Creates the app folder under documents to store the log files 
         try {
-            String userDocs = new JFileChooser().getFileSystemView().getDefaultDirectory().getAbsolutePath();
-            File baseFolder = new File(userDocs, "AutoPrintR");
+            
+            File baseFolder = new File(progDataFolder, "AutoPrintR");
             if (!baseFolder.exists()) baseFolder.mkdirs();
 
             File logFile = new File(baseFolder, "printed_files.txt");
@@ -476,7 +486,7 @@ public class AutoPrintR implements ActionListener {
             if (!logFile.exists()) logFile.createNewFile();
             if (!folderFile.exists()) folderFile.createNewFile();
             
-            logFilePath = logFile.getAbsolutePath();
+            printedFilesLogFilePath = logFile.getAbsolutePath();
             printerFolder = folderFile.getAbsolutePath();
         } catch (IOException e) {
             Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, e);
@@ -485,8 +495,8 @@ public class AutoPrintR implements ActionListener {
 
     //writing the installation date into a file
     private static String installationDate() throws IOException {
-        String userDocs = new JFileChooser().getFileSystemView().getDefaultDirectory().getAbsolutePath();
-        File file = new File(userDocs + File.separator + "AutoPrintR" + File.separator + INSTALL_INFO_FILE);
+        
+        File file = new File(progDataFolder + File.separator + "AutoPrintR" + File.separator + INSTALL_INFO_FILE);
         if (!file.exists()) {
             String now = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
             try (BufferedWriter w = new BufferedWriter(new FileWriter(file))) {
@@ -501,7 +511,7 @@ public class AutoPrintR implements ActionListener {
     private static void chooseFolderToWatch() {
         String saved = readDirectory();
         if (saved != null && !saved.trim().isEmpty()) {
-            folderPath = saved.trim();
+            watchFolder = saved.trim();
             return;
         }
 
@@ -514,8 +524,8 @@ public class AutoPrintR implements ActionListener {
                 File selected = chooser.getSelectedFile();
                 int confirm = JOptionPane.showConfirmDialog(null, "Use this folder?\n" + selected.getAbsolutePath());
                 if (confirm == 0) {
-                    folderPath = selected.getAbsolutePath();
-                    saveDirectory(folderPath);
+                    watchFolder = selected.getAbsolutePath();
+                    saveDirectory(watchFolder);
                     chosen = true;
                 }
             } else {
@@ -560,7 +570,7 @@ public class AutoPrintR implements ActionListener {
     private static Set<String> loadPrintedFiles() {         
         // Loads the printed file names from the log file called printed_files.txt located in the documents folder. 
         Set<String> printed = new HashSet<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(logFilePath))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(printedFilesLogFilePath))) {
             String line;
             while ((line = br.readLine()) != null) printed.add(line.trim().toLowerCase());
         } catch (IOException ignored) {}
@@ -568,7 +578,7 @@ public class AutoPrintR implements ActionListener {
     }
 
     private static void appendToLogFile(String fileName) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFilePath, true))) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(printedFilesLogFilePath, true))) {
             writer.write(fileName);
             writer.newLine();
         } catch (IOException ignored) {}
@@ -588,9 +598,9 @@ public class AutoPrintR implements ActionListener {
                     File selected = chooser.getSelectedFile();
                     int confirm = JOptionPane.showConfirmDialog(null, "Use this folder?\n" + selected.getAbsolutePath());
                     if (confirm == 0) {
-                        folderPath = selected.getAbsolutePath();
-                        msgTxt.append("Changed Watch folder to: " + folderPath + "\n");
-                        saveDirectory(folderPath);
+                        watchFolder = selected.getAbsolutePath();
+                        msgTxt.append("Changed Watch folder to: " + watchFolder + "\n");
+                        saveDirectory(watchFolder);
                         chosen = true;
                     }
                 } else {
@@ -655,7 +665,12 @@ public class AutoPrintR implements ActionListener {
     }
     
     //getting the installation path of the APP 
-    public static String getAppBasePath() {
-        return System.getProperty("user.dir");
+    private static String getAppBasePath() {
+        try {
+            return new File(AutoPrintR.class.getProtectionDomain().getCodeSource().getLocation().toURI())
+                       .getParentFile().getAbsolutePath();
+        } catch (Exception e) {
+            return System.getProperty("user.dir"); // fallback
+        }
     }
 }
