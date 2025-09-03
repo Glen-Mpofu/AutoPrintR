@@ -21,6 +21,13 @@ import javax.swing.*;
 import javax.swing.text.DefaultCaret;
 
 
+import javax.print.PrintService;
+import javax.print.PrintServiceLookup;
+import java.awt.print.*;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.printing.PDFPrintable;
+import org.apache.pdfbox.printing.Scaling;
+
 //add a log file. change location of the file from documents to ProgramData
 public class AutoPrintR implements ActionListener {
     
@@ -351,7 +358,7 @@ public class AutoPrintR implements ActionListener {
                 switch (ext) {
                     case "pdf":
                         //PDF Printing using SumatraPDF an app for PDF Printing
-                        printWithSumatra(file);                                              
+                        printWithPDFBox(file);                                              
                         
                         break;
                     case "doc": case "docx": case "xls": case "xlsx": case "ppt": case "pptx":
@@ -403,26 +410,36 @@ public class AutoPrintR implements ActionListener {
     }
     
     //Prints using the SumatraPDF app for silent PDF printing. This is used so the desktop doesn't run into errors if a user's computer has no PDF Reader
-    private static void printWithSumatra(File file) throws IOException {
-     
-        String basePath = getAppBasePath();
-        //msgTxt.append(basePath);
-        File sumatra = new File(basePath + "/app/tools/SumatraPDF.exe"); //uncomment when building
-        //File sumatra = new File(basePath + "/dist/tools/SumatraPDF.exe");
-        if (!sumatra.exists()) {                      
-           fallBackPrinter(file);  
-           throw new IOException("SumatraPDF not found at " + sumatra.getAbsolutePath() + "\n");
+    private static void printWithPDFBox(File file) throws IOException, PrinterException {
+    // Load the PDF document
+        try (PDDocument document = PDDocument.load(file)) {
+
+            // Lookup default printer
+            PrintService defaultPrinter = PrintServiceLookup.lookupDefaultPrintService();
+            if (defaultPrinter == null) {
+                fallBackPrinter(file);
+                throw new IOException("No default printer found.");
+            }
+
+            // Set up PrinterJob
+            PrinterJob job = PrinterJob.getPrinterJob();
+            job.setPrintService(defaultPrinter);
+
+            // Create a PDFPrintable for printing
+            PDFPrintable printable = new PDFPrintable(document, Scaling.SHRINK_TO_FIT);
+            job.setPrintable(printable);
+
+            // Print as many copies as specified
+            for (int i = 0; i < copiesPerDocument; i++) {
+                job.print();
+                System.out.println("PDFBox Logging: " + file.getAbsolutePath());
+            }
+
+            appendToLogFile(file.getName());
+            msgTxt.append("✅ PDF Printed (PDFBox): " + file.getName() + "\n");
         }
-        
-        //C:\Users\Reception\OneDrive - Tshwane University of Technology\Desktop\Tshepo\AutoPrintR\AutoPrintR\dist\tools\SumatraPDF.exe
-        for (int i = 0; i < copiesPerDocument; i++) {
-            Runtime.getRuntime().exec("\"" + sumatra.getAbsolutePath() + "\" -print-to-default \"" + file.getAbsolutePath() + "\"");      
-            System.out.println("Pdf Logging: "+file.getAbsolutePath());  
-        }    
-        appendToLogFile(file.getName());
-        msgTxt.append("✅ PDF Printed: " + file.getName() + "\n");                
     }
-    
+
     //Office Silent printing using a PowerShell Script.
     private static void printWithOffice(File file) throws IOException {
         int counter=0;
