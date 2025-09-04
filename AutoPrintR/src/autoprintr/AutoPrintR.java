@@ -10,6 +10,7 @@ import java.net.ServerSocket;
 import java.time.Instant;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.JOptionPane;
 
 public class AutoPrintR {
 
@@ -74,7 +75,17 @@ public class AutoPrintR {
     }
 
     public static void main(String[] args) {
-        new AutoPrintR().start();
+        savePortNumber();
+        if(checkIfRunning() == false){
+            new AutoPrintR().start();
+        }else{
+            JOptionPane.showMessageDialog(null, "AutoPrintR is already running. Check the 'System Tray' ", 
+                    "Already Running", 
+                    JOptionPane.INFORMATION_MESSAGE);
+            System.exit(0);
+        }
+        
+            
     }
     
     private static boolean checkIfRunning() {
