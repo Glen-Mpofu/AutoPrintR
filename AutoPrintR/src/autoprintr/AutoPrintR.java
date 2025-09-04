@@ -444,9 +444,13 @@ public class AutoPrintR implements ActionListener {
     private static void printWithOffice(File file) throws IOException {
         int counter=0;
         String basePath = getAppBasePath();
+        System.out.println(basePath);
         File script = new File(basePath + "/app/tools/print_office.ps1"); //built app file installation path
-        //File script = new File(basePath + "/dist/tools/print_office.ps1"); //netbeans project location
         
+        //File script = new File(basePath + "/dist/tools/print_office.ps1"); //netbeans project location
+        msgTxt.append(script.getAbsolutePath() + "\n");
+        
+        System.out.println(basePath);
         //msgTxt.append(script.getAbsolutePath());
         if (!script.exists()) {                           
                 fallBackPrinter(file);                            
@@ -682,12 +686,8 @@ public class AutoPrintR implements ActionListener {
     }
     
     //getting the installation path of the APP 
-    private static String getAppBasePath() {
-        try {
-            return new File(AutoPrintR.class.getProtectionDomain().getCodeSource().getLocation().toURI())
-                       .getParentFile().getAbsolutePath();
-        } catch (Exception e) {
-            return System.getProperty("user.dir"); // fallback
-        }
+    private static String getAppBasePath() {        
+        return System.getProperty("user.dir"); // fallback        
     }
+    
 }

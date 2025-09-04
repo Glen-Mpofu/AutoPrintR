@@ -14,6 +14,7 @@ jpackage ^
   --description "AutoPrintR automatically monitors and prints files from a selected folder." ^
   --win-dir-chooser ^
   --license-file "C:\Users\Reception\OneDrive - Tshwane University of Technology\Desktop\Tshepo\Java\AutoPrintR\AutoPrintR\licence.txt" ^
-   --runtime-image "C:\Build\AutoPrintR\jdk21-jre"
+  --runtime-image "C:\Program Files\Java\jdk-21" ^
+  --win-per-user-install ^
   --icon "C:\Users\Reception\OneDrive - Tshwane University of Technology\Desktop\Tshepo\Java\AutoPrintR\AutoPrintR\src\resources\AutoPrintR Logo Design.ico"
  
