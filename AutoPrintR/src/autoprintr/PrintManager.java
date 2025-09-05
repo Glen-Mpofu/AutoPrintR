@@ -12,22 +12,26 @@ import java.awt.image.BufferedImage;
 import java.awt.print.Printable;
 import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
+import java.util.ArrayList;
 
 public class PrintManager {
 
     private int copiesPerDocument;
     private final LogManager logManager;
     private final AutoPrintRUI ui;
-
-    public PrintManager(int copies, LogManager logManager, AutoPrintRUI ui) {
+    private ConfigManager configManager;
+    public PrintManager(int copies, LogManager logManager, AutoPrintRUI ui, ConfigManager configManager) {
         this.copiesPerDocument = copies;
         this.logManager = logManager;
         this.ui = ui;
+        this.configManager = configManager;
     }
 
     public void setCopiesPerDocument(int copies) {
@@ -41,6 +45,8 @@ public class PrintManager {
 
         if (!(created.isAfter(installInstant) || modified.isAfter(installInstant))) {
             ui.logMessage("Skipped (too old): " + file.getName());
+            configManager.appendToLogFile("Skipped (too old): " + file.getName());
+            
             return;
         }
 
@@ -48,20 +54,35 @@ public class PrintManager {
         String symbol = file.getName().substring(0,2);
         //System.out.println(symbol);
         
-        if(!ext.equals("tmp") && !symbol.equals("~$")){
-            if (ext.equals("pdf")) {
-                printPDF(file);
-            } else if (ext.equals("doc") || ext.equals("docx") ||
-                       ext.equals("xls") || ext.equals("xlsx") ||
-                       ext.equals("ppt") || ext.equals("pptx")) {
-                printOffice(file);
-            } else if (ext.equals("txt")) {
-                printTxt(file);
-            } else if (ext.equals("jpg") || ext.equals("jpeg") ||
-                       ext.equals("png") || ext.equals("bmp")) {
-                printImage(file);
-            }else {
-                fallbackPrint(file);
+        //logic for checking if the file is already printed or not
+        File logFile = logManager.getLogFile();
+            FileReader fr = new FileReader(logFile);
+            BufferedReader br = new BufferedReader(fr);
+            
+            ArrayList<String> printedFiles = new ArrayList<>();
+            String f = br.readLine();
+            while(f != null){
+                printedFiles.add(f); 
+                f = br.readLine();
+            }
+            
+            br.close();
+            fr.close();
+            
+        if(!printedFiles.contains(file.getName().toLowerCase() )){
+            if(!ext.equals("tmp") && !symbol.equals("~$")){
+                if (ext.equals("pdf")) {
+                    printPDF(file);
+                } else if (ext.equals("doc") || ext.equals("docx") ||
+                           ext.equals("xls") || ext.equals("xlsx") ||
+                           ext.equals("ppt") || ext.equals("pptx")) {
+                    printOffice(file);
+                } else if (ext.equals("txt")) {
+                    printTxt(file);
+                } else if (ext.equals("jpg") || ext.equals("jpeg") ||
+                           ext.equals("png") || ext.equals("bmp")) {
+                    printImage(file);
+                }
             }
         }
     }
@@ -79,8 +100,9 @@ public class PrintManager {
                 job.print();
             }
 
-            logManager.logPrinted(file.getName());
+            logManager.logPrinted(file.getName().toLowerCase());
             ui.logMessage("PDF printed: " + file.getName());
+            configManager.appendToLogFile("PDF printed: " + file.getName());
         }
     }
 
@@ -97,16 +119,18 @@ public class PrintManager {
             Runtime.getRuntime().exec("powershell.exe -ExecutionPolicy Bypass -File \"" +
                     script.getAbsolutePath() + "\" \"" + file.getAbsolutePath() + "\"");
         }
-        logManager.logPrinted(file.getName());
+        logManager.logPrinted(file.getName().toLowerCase());
         ui.logMessage("Office document printed: " + file.getName());
+        configManager.appendToLogFile("Office document printed: " + file.getName());
     }
 
     private void printTxt(File file) throws IOException {
         for (int i = 0; i < copiesPerDocument; i++) {
             Desktop.getDesktop().print(file);
         }
-        logManager.logPrinted(file.getName());
+        logManager.logPrinted(file.getName().toLowerCase());
         ui.logMessage("TXT file printed: " + file.getName());
+        configManager.appendToLogFile("TXT file printed: " + file.getName());
     }
 
     private void printImage(File file) throws Exception {
@@ -125,20 +149,22 @@ public class PrintManager {
         for (int i = 0; i < copiesPerDocument; i++) {
             job.print();
         }
-        logManager.logPrinted(file.getName());
+        logManager.logPrinted(file.getName().toLowerCase());
         ui.logMessage("Image printed: " + file.getName());
+        configManager.appendToLogFile("Image printed: " + file.getName());
     }
 
     private void fallbackPrint(File file) throws IOException {
         for (int i = 0; i < copiesPerDocument; i++) {
             Desktop.getDesktop().print(file);
         }
-        logManager.logPrinted(file.getName());
+        logManager.logPrinted(file.getName().toLowerCase());
         ui.logMessage("Fallback printer activated: " + file.getName());
+        configManager.appendToLogFile("Fallback printer activated: " + file.getName());
     }
 
     private static String getFileExtension(File file) {
-        String name = file.getName();
+        String name = file.getName().toLowerCase();
         int lastDot = name.lastIndexOf('.');
         return lastDot == -1 ? "" : name.substring(lastDot + 1).toLowerCase();
     }

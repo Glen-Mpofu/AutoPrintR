@@ -3,7 +3,7 @@ package autoprintr;
 import java.io.*;
 
 public class LogManager {
-    private final File logFile;
+    private File logFile;
 
     public LogManager() {
         File appFolder = new File(System.getenv("ProgramData"), "AutoPrintR");
@@ -20,11 +20,9 @@ public class LogManager {
             writer.newLine();
         } catch (IOException ignored) {}
     }
-
-    public void logError(String message, Exception e) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFile, true))) {
-            writer.write("ERROR: " + message + " - " + e.getMessage());
-            writer.newLine();
-        } catch (IOException ignored) {}
+    
+    public File getLogFile() {
+        return logFile;
     }
+    
 }

@@ -156,4 +156,9 @@ public class AutoPrintRUI implements ActionListener {
             }
         }
     }
+
+    public JFrame getGui() {
+        return gui;
+    }
+    
 }

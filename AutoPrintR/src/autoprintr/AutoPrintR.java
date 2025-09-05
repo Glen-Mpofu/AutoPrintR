@@ -10,6 +10,7 @@ import java.net.ServerSocket;
 import java.time.Instant;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 
 public class AutoPrintR {
@@ -34,23 +35,63 @@ public class AutoPrintR {
         // Load settings
         int copies = configManager.getCopiesPerDocument();
         String watchFolder = configManager.getWatchFolder();
+        
+        if(watchFolder == null || watchFolder.isBlank()){
+            JFileChooser fChooser = new JFileChooser();
+            fChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            int result = fChooser.showOpenDialog(null);
+            
+            if(result == JFileChooser.APPROVE_OPTION){
+                watchFolder = fChooser.getSelectedFile().getAbsolutePath();
+                
+                configManager.setWatchFolder(watchFolder);
+                
+            }else{
+                try {
+                    JOptionPane.showMessageDialog(null, "No \"Watch Folder\" selected. Exiting...");
+                    Thread.sleep(5000);
+                    System.exit(0);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(AutoPrintR.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
 
         // UI
         ui = new AutoPrintRUI(this, copies, watchFolder);
 
         // Printing manager
-        printManager = new PrintManager(copies, logManager, ui);
+        printManager = new PrintManager(copies, logManager, ui, configManager);
         
         // Installation timestamp
         installInstant = configManager.getOrCreateInstallInstant();
-    
+        
+        // First scan all existing files in the folder
+        File dir = new File(watchFolder);
+        
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isFile()) {
+                    try {
+                        printManager.printFileIfNew(f, installInstant);
+                    } catch (Exception e) {                        
+                        ui.logMessage(e.getMessage());
+                        configManager.appendToLogFile("Error scanning file " + f.getName());
+                        configManager.appendToLogFile(e.getMessage());
+                    }
+                }
+            }
+        }
+        
         // Folder watcher
         fileWatcherService = new FileWatcherService(watchFolder, (File f) -> {
-            try {
+            try {   
                 printManager.printFileIfNew(f, installInstant);
             } catch (Exception e) {
-                logManager.logError("Error printing file " + f.getName(), e);
+                
                 ui.logMessage(e.getMessage());
+                configManager.appendToLogFile(e.getMessage());
             }
         });
 
@@ -60,18 +101,23 @@ public class AutoPrintR {
         ui.show();
         fileWatcherService.startWatching();
         ui.logMessage("Watching: \"" + configManager.getWatchFolder() + "\" for any new files");
+        configManager.appendToLogFile("Watching: \"" + configManager.getWatchFolder() + "\" for any new files");
     }
 
     public void updateCopies(int copies) {
         configManager.setCopiesPerDocument(copies);
         printManager.setCopiesPerDocument(copies);
         ui.logMessage("Copies per document updated to: " + copies);
+        configManager.appendToLogFile("Copies per document updated to: " + copies);
     }
 
     public void updateWatchFolder(String folder) {
         configManager.setWatchFolder(folder);
         fileWatcherService.setWatchFolder(folder);
+        
+        
         ui.logMessage("New Watch folder: \"" + folder + "\" selected");
+        configManager.appendToLogFile("New Watch folder: \"" + folder + "\" selected");
     }
 
     public static void main(String[] args) {
