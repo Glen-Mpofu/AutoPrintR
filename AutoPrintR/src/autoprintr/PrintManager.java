@@ -108,8 +108,8 @@ public class PrintManager {
 
     private void printOffice(File file) throws IOException {
         String basePath = System.getProperty("user.dir");
-        //File script = new File(basePath + "/app/tools/print_office.ps1");
-        File script = new File(basePath + "/dist/tools/print_office.ps1");
+        File script = new File(basePath + "/app/tools/print_office.ps1");
+        //File script = new File(basePath + "/dist/tools/print_office.ps1");
         if (!script.exists()) {
             fallbackPrint(file);
             throw new IOException("PowerShell script not found.");
