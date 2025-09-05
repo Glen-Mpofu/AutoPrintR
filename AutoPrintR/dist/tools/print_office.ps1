@@ -1,43 +1,33 @@
-param(
-    [string]$filepath
-)
+param([string]$filepath)
 
-try {
-    $ext = [System.IO.Path]::GetExtension($filepath).ToLower()
+# Define log file
+$appFolder = Join-Path $env:ProgramData "AutoPrintR"
+if (-not (Test-Path $appFolder)) { New-Item -ItemType Directory -Path $appFolder | Out-Null }
 
-    switch ($ext) {
-        ".docx" { $app = New-Object -ComObject Word.Application }
-        ".doc"  { $app = New-Object -ComObject Word.Application }
-        ".xls"  { $app = New-Object -ComObject Excel.Application }
-        ".xlsx" { $app = New-Object -ComObject Excel.Application }
-        ".ppt"  { $app = New-Object -ComObject PowerPoint.Application }
-        ".pptx" { $app = New-Object -ComObject PowerPoint.Application }
-        default { exit }
+$logFile = Join-Path $appFolder "log_file.txt"
+if (-not (Test-Path $logFile)) { New-Item -ItemType File -Path $logFile | Out-Null }
+
+# Print function
+function print {
+    param([string]$file)
+    try {
+        Start-Process -FilePath $file -Verb Print -ErrorAction Stop
+        Write-Host "Printed: $file"
+        Add-Content -Path $logFile -Value "$(Get-Date): Printed $file"
+    } catch {
+        Write-Host "Print failed: $file"
+        Add-Content -Path $logFile -Value "$(Get-Date): Print failed $file - $($_.Exception.Message)"
     }
-
-    $app.Visible = $false
-
-    if ($ext -like ".doc*") {
-        $doc = $app.Documents.Open($filepath, [ref]$false, [ref]$true)
-        $doc.PrintOut()
-        $doc.Close()
-    }
-    elseif ($ext -like ".xls*") {
-        $wb = $app.Workbooks.Open($filepath)
-        $wb.PrintOut()
-        $wb.Close($false)
-    }
-    elseif ($ext -like ".ppt*") {
-        $ppt = $app.Presentations.Open($filepath, $false, $false, $false)
-        $ppt.PrintOut()
-        $ppt.Close()
-    }
-
-    $app.Quit()
 }
-catch {
-    $errorMessage = $_.Exception.Message
-    $logPath = Join-Path ([System.IO.Path]::GetDirectoryName($filepath)) "print_error_log.txt"
-    Add-Content -Path $logPath -Value "$(Get-Date): Error printing file $filepath - $errorMessage"
-    exit 1
+
+# Print any supported file
+$ext = [System.IO.Path]::GetExtension($filepath).ToLower()
+switch ($ext) {
+    ".doc"  { print $filepath }
+    ".docx" { print $filepath }
+    ".xls"  { print $filepath }
+    ".xlsx" { print $filepath }
+    ".ppt"  { print $filepath }
+    ".pptx" { print $filepath }
+    default { Write-Host "Unsupported file type: $ext"; exit }
 }

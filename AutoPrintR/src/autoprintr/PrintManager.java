@@ -94,7 +94,7 @@ public class PrintManager {
 
             PrinterJob job = PrinterJob.getPrinterJob();
             job.setPrintService(printer);
-            job.setPrintable(new PDFPrintable(document, Scaling.SHRINK_TO_FIT));
+            job.setPrintable(new PDFPrintable(document, Scaling.ACTUAL_SIZE));
 
             for (int i = 0; i < copiesPerDocument; i++) {
                 job.print();
@@ -108,16 +108,15 @@ public class PrintManager {
 
     private void printOffice(File file) throws IOException {
         String basePath = System.getProperty("user.dir");
-        File script = new File(basePath + "/app/tools/print_office.ps1");
-        
+        //File script = new File(basePath + "/app/tools/print_office.ps1");
+        File script = new File(basePath + "/dist/tools/print_office.ps1");
         if (!script.exists()) {
             fallbackPrint(file);
             throw new IOException("PowerShell script not found.");
         }
 
         for (int i = 0; i < copiesPerDocument; i++) {
-            Runtime.getRuntime().exec("powershell.exe -ExecutionPolicy Bypass -File \"" +
-                    script.getAbsolutePath() + "\" \"" + file.getAbsolutePath() + "\"");
+            Runtime.getRuntime().exec("powershell.exe -ExecutionPolicy Bypass -File \"" + script.getAbsolutePath() + "\" \"" + file.getAbsolutePath() + "\"");
         }
         logManager.logPrinted(file.getName().toLowerCase());
         ui.logMessage("Office document printed: " + file.getName());
