@@ -46,7 +46,7 @@ public class PrintManager {
 
         String ext = getFileExtension(file);
         String symbol = file.getName().substring(0,2);
-        System.out.println(symbol);
+        //System.out.println(symbol);
         
         if(!ext.equals("tmp") && !symbol.equals("~$")){
             if (ext.equals("pdf")) {
@@ -80,13 +80,14 @@ public class PrintManager {
             }
 
             logManager.logPrinted(file.getName());
-            ui.logMessage("✅ PDF printed: " + file.getName());
+            ui.logMessage("PDF printed: " + file.getName());
         }
     }
 
     private void printOffice(File file) throws IOException {
         String basePath = System.getProperty("user.dir");
         File script = new File(basePath + "/app/tools/print_office.ps1");
+        
         if (!script.exists()) {
             fallbackPrint(file);
             throw new IOException("PowerShell script not found.");
@@ -97,7 +98,7 @@ public class PrintManager {
                     script.getAbsolutePath() + "\" \"" + file.getAbsolutePath() + "\"");
         }
         logManager.logPrinted(file.getName());
-        ui.logMessage("✅ Office document printed: " + file.getName());
+        ui.logMessage("Office document printed: " + file.getName());
     }
 
     private void printTxt(File file) throws IOException {
@@ -105,7 +106,7 @@ public class PrintManager {
             Desktop.getDesktop().print(file);
         }
         logManager.logPrinted(file.getName());
-        ui.logMessage("✅ TXT file printed: " + file.getName());
+        ui.logMessage("TXT file printed: " + file.getName());
     }
 
     private void printImage(File file) throws Exception {
@@ -125,7 +126,7 @@ public class PrintManager {
             job.print();
         }
         logManager.logPrinted(file.getName());
-        ui.logMessage("✅ Image printed: " + file.getName());
+        ui.logMessage("Image printed: " + file.getName());
     }
 
     private void fallbackPrint(File file) throws IOException {
@@ -133,7 +134,7 @@ public class PrintManager {
             Desktop.getDesktop().print(file);
         }
         logManager.logPrinted(file.getName());
-        ui.logMessage("✅ Fallback printed: " + file.getName());
+        ui.logMessage("Fallback printer activated: " + file.getName());
     }
 
     private static String getFileExtension(File file) {

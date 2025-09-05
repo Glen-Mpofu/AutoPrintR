@@ -146,7 +146,14 @@ public class AutoPrintRUI implements ActionListener {
             }
         } else if (e.getSource() == copiesListBox) {
             int copies = (int) copiesListBox.getSelectedItem();
-            app.updateCopies(copies);
+            
+            int confirm = JOptionPane.showConfirmDialog(null, "Are you sure you want to change the \"copies per document to\" " + copies+"? ");
+            if(confirm == 0){
+                app.updateCopies(copies);
+            }            
+            else{
+                copiesListBox.setSelectedItem(new ConfigManager().getCopiesPerDocument());
+            }
         }
     }
 }

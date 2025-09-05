@@ -59,7 +59,7 @@ public class AutoPrintR {
     public void start() {
         ui.show();
         fileWatcherService.startWatching();
-        ui.logMessage("Watching: " + configManager.getWatchFolder() + " for any new files");
+        ui.logMessage("Watching: \"" + configManager.getWatchFolder() + "\" for any new files");
     }
 
     public void updateCopies(int copies) {
@@ -71,7 +71,7 @@ public class AutoPrintR {
     public void updateWatchFolder(String folder) {
         configManager.setWatchFolder(folder);
         fileWatcherService.setWatchFolder(folder);
-        ui.logMessage("New Watch folder: " + folder);
+        ui.logMessage("New Watch folder: \"" + folder + "\" selected");
     }
 
     public static void main(String[] args) {
